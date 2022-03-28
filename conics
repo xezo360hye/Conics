@@ -1,0 +1,106 @@
+#!/bin/bash
+
+usage() {
+	echo "\
+Usage: conics [ OPTIONS ]
+
+Available options:
+	-h --help		Show this message and exit
+	-d --dir	STR	Directory where images will be saved
+	-f --format	STR	Format of files (must end with 3+ X)
+	-c --count	INT	Count of images to download
+	-t --time	INT	Next image if no user input within TIME seconds
+	-r --remove	[B]	Remove images after closing FBI (if no ARG after, set to True)
+
+Default FORMAT is img-XXXXX, DIR is . (current) and COUNT is 1"
+
+	exit $1
+}
+
+
+# Default options
+declare FORMAT="img-XXXXX" DIR="." REMOVE=false
+declare -i COUNT=1 TIME=5
+
+
+# Parse args
+while [[ -n "$1" ]]; do
+	case "$1" in
+	-h|--help)
+		usage 0;;
+	-d|--dir)
+		if [[ -d "$DIR" ]]; then
+			DIR="$2"
+			shift 2
+		else
+			echo "Directory not found: $DIR"
+			exit 4
+		fi
+		;;
+	-f|--format)
+		if [[ "$2" =~ ^.*XXX+$ ]]; then
+			FORMAT="$2"
+			shift 2
+		else
+			echo "Invalid format: $2\nRun 'conics -h'"
+			exit 3
+		fi
+		;;
+	-c|--count)
+		if [[ "$2" =~ ^[0-9]+$ ]] && (( "$2" > 0 )); then
+			COUNT="$2"
+			shift 2
+		else
+			echo "Option 'count' requires INT > 0"
+			exit 2
+		fi
+		;;
+	-t|--time)
+		if [[ "$2" =~ ^[0-9]+$ ]] && (( "$2" > 0 )); then
+			TIME="$2"
+			shift 2
+		else
+			echo "Option 'time' requires INT > 0"
+			exit 5
+		fi
+		;;
+	-r|--remove)
+		if [[ "$2" =~ ^(true|false)$ ]] && (( "$2" > 0 )); then
+			REMOVE="$2"
+			shift 2
+		else
+			REMOVE=true
+			shift
+		fi
+		;;
+	--)
+		break;;
+	*)
+		echo "Unknown option: $1"
+		usage 1;;
+	esac
+done
+
+
+# Check if directory is writable
+if [[ ! -w "$DIR" ]]; then
+	echo "Directory is unwritable"
+	exit 3
+fi
+
+
+# Download files
+while (( COUNT-- )); do
+	files+=( $(mktemp "$DIR/$FORMAT") )
+	curl -so "${files[-1]}" "$(curl -s "https://xkcd.com/$(( $RANDOM % 2599 ))/info.0.json" | jq . | grep -o '"img": ".*"' | grep -o 'h[^"]*')" &
+done
+wait -n
+
+
+# Watch memes ^_^
+fbi -t "$TIME" -1 -a -l <(echo "${files[@]}" | tr " " "\n") &> /dev/null
+
+# Remove files
+if $REMOVE; then
+	rm -rf "${files[@]}"
+fi

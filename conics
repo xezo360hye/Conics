@@ -1,106 +1,242 @@
 #!/bin/bash
 
-usage() {
+# Default options
+# Feel free to change them
+conics::defaults() {
+	FORMAT="img-XXXXX"		# Format in which images will be saved (must end with 3+ X for mktemp)
+	DIR="~/Pictures"		# Directory where images will be saved (relative to current directory)
+	COUNT=5				# Count of images to download at time
+	TIME=0				# Time to wait for user input for next image in seconds (0 = off)
+	REMOVE=false			# Remove images after closing FBI (true/false)
+	VERBOSE=false			# Verbose output (true/false)
+	VIEWER="fbi"			# Image viewer to use (fbi/fim)
+}
+
+
+# Usage of conics
+conics::usage() {
+	# Get default options
+	conics::defaults
+
+	# Display usage
 	echo "\
 Usage: conics [ OPTIONS ]
 
 Available options:
-	-h --help		Show this message and exit
-	-d --dir	STR	Directory where images will be saved
-	-f --format	STR	Format of files (must end with 3+ X)
-	-c --count	INT	Count of images to download
-	-t --time	INT	Next image if no user input within TIME seconds
-	-r --remove	[B]	Remove images after closing FBI (if no ARG after, set to True)
+	-h, --help		Display this help message
+	-f, --format		Format in which images will be saved (default: $FORMAT)
+	-d, --dir		Directory where images will be saved (default: $DIR)
+	-c, --count		Count of images to download (0 = infinity) (default: $COUNT)
+	-t, --time		Time to wait for user input for next image (0 = off) (default: $TIME)
+	-r, --remove		Remove images after closing FBI (default: $REMOVE)
+	-v, --verbose		Verbose output (default: $VERBOSE)
+	-l, --latest		Download latest image (default: false)
+	-w, --viewer		Viewer to use (FBI or FIM) (default: fbi)"
 
-Default FORMAT is img-XXXXX, DIR is . (current) and COUNT is 1"
-
-	exit $1
+	# Exit with status '$1' if given, else with status 0.
+	exit ${1:-0}
 }
 
 
-# Default options
-declare FORMAT="img-XXXXX" DIR="." REMOVE=false
-declare -i COUNT=1 TIME=5
+# Simple logger
+conics::log() {
+	if "$VERBOSE"; then
+		echo -e "[$(date +%T) at ${FUNCNAME[1]}] $@" > /dev/tty
+	fi
+}
 
 
-# Parse args
-while [[ -n "$1" ]]; do
-	case "$1" in
-	-h|--help)
-		usage 0;;
-	-d|--dir)
-		if [[ -d "$DIR" ]]; then
-			DIR="$2"
-			shift 2
-		else
-			echo "Directory not found: $DIR"
-			exit 4
-		fi
-		;;
-	-f|--format)
-		if [[ "$2" =~ ^.*XXX+$ ]]; then
-			FORMAT="$2"
-			shift 2
-		else
-			echo "Invalid format: $2\nRun 'conics -h'"
-			exit 3
-		fi
-		;;
-	-c|--count)
-		if [[ "$2" =~ ^[0-9]+$ ]] && (( "$2" > 0 )); then
-			COUNT="$2"
-			shift 2
-		else
-			echo "Option 'count' requires INT > 0"
-			exit 2
-		fi
-		;;
-	-t|--time)
-		if [[ "$2" =~ ^[0-9]+$ ]] && (( "$2" > 0 )); then
-			TIME="$2"
-			shift 2
-		else
-			echo "Option 'time' requires INT > 0"
-			exit 5
-		fi
-		;;
-	-r|--remove)
-		if [[ "$2" =~ ^(true|false)$ ]] && (( "$2" > 0 )); then
-			REMOVE="$2"
-			shift 2
-		else
+# Arguments parser (check 'conics::usage' for more info)
+conics::parse() {
+	while (( "$#" > 0 )); do
+		conics::log "Parsing argument '$1'"
+		case "$1" in
+		-h|--help)
+			# Show usage and exit with default status 0
+			conics::usage
+			;;
+		-d|--dir)
+			# Check if '$2' is a directory and is writable
+			if [[ -d "$2" && -w "$2" ]]; then
+				DIR="$2"
+				conics::log "DIR set to '$DIR'"
+				shift 2
+			else
+				echo "Directory not found or unwritable: '$2'"
+				conics::usage 1
+			fi
+			;;
+		-f|--format)
+			# Check if format ends with 3+ X
+			if [[ "$2" =~ ^.*XXX+$ ]]; then
+				FORMAT="$2"
+				conics::log "FORMAT set to '$FORMAT'"
+				shift 2
+			else
+				echo "Invalid format: '$2'"
+				conics::usage 1
+			fi
+			;;
+		-c|--count)
+			# Check if '$2' contains numbers only
+			if [[ "$2" =~ ^[0-9]+$ ]]; then
+				# Check if '$2' is not greater than max and is not 0
+				if (( "$2" <= "$MAX" && "$2" != 0 )); then
+					COUNT="$2"
+					conics::log "COUNT set to '$COUNT'"
+					shift 2
+				else
+					echo "Argument '$2' for option '$1' is out of range (0-$MAX)"
+					conics::usage 1
+				fi
+			else
+				echo "Option '$1' requires a positive integer, given: '$2'"
+				conics::usage 1
+			fi
+			;;
+		-t|--time)
+			# Check if TIME is a positive integer
+			if [[ "$2" =~ ^[0-9]+$ ]]; then
+				TIME="$2"
+				conics::log "TIME set to '$TIME' seconds"
+				shift 2
+			else
+				echo "Option '$1' requires a positive integer, given: '$2'"
+				conics::usage 1
+			fi
+			;;
+		-r|--remove)
+			# Remove images after closing FBI
 			REMOVE=true
+			conics::log "Images will be removed after closing FBI"
 			shift
-		fi
-		;;
-	--)
-		break;;
-	*)
-		echo "Unknown option: $1"
-		usage 1;;
-	esac
-done
+			;;
+		-v|--verbose)
+			# Show verbose output
+			VERBOSE=true
+			conics::log "Verbose output enabled"
+			shift
+			;;
+		-l|--latest)
+			# TODO
+			;;
+		-w|--viewer)
+			# Check if '$2' is a valid viewer
+			if [[ "$2" =~ ^(fbi|fim)$ ]]; then
+				VIEWER="$2"
+				conics::log "VIEWER set to '$VIEWER'"
+				shift 2
+			else
+				echo "Invalid viewer: '$2'"
+				conics::usage 1
+			fi
+			;;
+		--)
+			# End of options
+			break
+			;;
+		*)
+			# If an option is not recognized, show usage and exit with status 1
+			echo "Unknown option: $1"
+			conics::usage 1
+			;;
+		esac
+	done
+
+	# Make all variables read-only
+	readonly FORMAT DIR COUNT TIME REMOVE VERBOSE
+}
 
 
-# Check if directory is writable
-if [[ ! -w "$DIR" ]]; then
-	echo "Directory is unwritable"
-	exit 3
-fi
+conics::download() {
+	# Download images
+	for (( i = 0; i < "$COUNT"; i++ )); do
+		IMAGES+=( $(mktemp "$DIR/$FORMAT") )
+		curl -so "${IMAGES[-1]}" "$(curl -s "https://xkcd.com/$(( RANDOM % MAX ))/info.0.json" | jq -r '.img')" &
+	done
+
+	# Wait for all images to be downloaded
+	unset i
+	wait
+}
 
 
-# Download files
-while (( COUNT-- )); do
-	files+=( $(mktemp "$DIR/$FORMAT") )
-	curl -so "${files[-1]}" "$(curl -s "https://xkcd.com/$(( $RANDOM % 2599 ))/info.0.json" | jq . | grep -o '"img": ".*"' | grep -o 'h[^"]*')" &
-done
-wait -n
+conics::watch() {
+	# Get count of images available
+	local MAX=$(curl -s https://xkcd.com/info.0.json | jq -r '.num')
+
+	# In case of error (e.g. no internet connection)
+	local status="${PIPESTATUS[0]}"
+	if [[ "$status" != 0 ]]; then
+		echo "Failed to connect to xkcd, curl returned error '$status'" >&2
+		exit "$status"
+	fi
+
+	# Infinite loop to watch new images
+	while :; do
+		# Set IMAGE array to empty
+		local -a IMAGES=()
+		conics::log "Starting download"
+		conics::download
+
+		conics::log "Download complete, starting FBI/FIM"
+		case "$VIEWER" in
+		fbi)
+			# Start FBI
+			fbi -t "$TIME" -a "${IMAGES[@]}"
+			;;
+		fim)
+			if [[ "$TIME" = 0 ]]; then
+				fim -a "${IMAGES[@]}"
+			else
+				fim -c "while(1){display; sleep \"$TIME\"; next; }" -a "${IMAGES[@]}"
+			fi
+			;;
+		esac
+
+		# This is a bit of a hack, but it works - even for both FBI and FIM!
+		case "$?" in
+		0)
+			# Closed normally
+			conics::log "Closed normally, continuing watching"
+			conics::remove
+			;;
+		42)
+			# Closed with Ctrl+C
+			conics::log "Closed with Ctrl+C, stopping watching"
+			conics::remove
+			return 0
+			;;
+		*)
+			# Closed with error
+			conics::log "Closed with error, stopping watching"
+			;;
+		esac
+	done
+	# It's needed to call 'remove' function here because it needs 'IMAGES' array and it's local
+	conics::log "Done!"
+}
 
 
-# Watch memes ^_^
-fbi -t "$TIME" -1 -a -l <(echo "${files[@]}" | tr " " "\n") &> /dev/null
+conics::remove() {
+	if "$REMOVE"; then
+		conics::log "Removing images"
+		rm -rf "${IMAGES[@]}"
+	fi
+}
 
-# Remove files
-if $REMOVE; then
-	rm -rf "${files[@]}"
+
+conics::main() {
+	conics::defaults
+	conics::parse "$@"
+	conics::log "Parsing arguments done"
+
+	conics::log "Starting watching"
+	conics::watch
+}
+
+
+# If this script is called directly, execute main function
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+	conics::main "$@"
 fi

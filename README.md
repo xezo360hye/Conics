@@ -48,9 +48,13 @@ This will do all the job needed
 
 # Usage
 
-To get help message use `conics -h` or `conics --help` - there's all you need to know about arguments
+To get help message use `conics -h` or `conics --help`
 
-To navigate through downloaded images, use `J` and `K` keys, or `space` to move forward UNTIL THE LAST ONE REACHED. Press `H` in FBI to get more info
+You can start watching by starting `conics` without arguments
+
+Press `H` in FBI / FIM to get information about it
+
+When you exit FBI / FIM using `Q` or `Esc`, it'll download more memes. To exit completely press Ctrl + C
 
 # Options
 
@@ -68,7 +72,7 @@ Count of comics you want to see. If not used, only one will be shown *(have you 
 
 ## Time (-t)
 
-Great feature of FBI: if you don't press any key in ARG seconds, it automatically goes to the next one
+Great feature of FBI: if you don't press any key in ARG seconds, it automatically goes to the next one. Works with FIM but **disables key navigation** so you can only exit with Ctrl + C
 
 ## Remove (-r)
 
@@ -76,4 +80,4 @@ To remove files after closing FBI / FIM. By default it's false, use this flag to
 
 ## Viewer (-w)
 
-
+You can use either FBI or FIM. Default is FBI

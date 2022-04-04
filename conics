@@ -15,7 +15,7 @@ conics::defaults() {
 
 # Usage of conics
 conics::usage() {
-	# Get default options
+	# Set default options
 	conics::defaults
 
 	# Display usage

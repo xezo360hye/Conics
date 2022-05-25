@@ -10,6 +10,9 @@ conics::defaults() {
 	REMOVE=false			# Remove images after closing FBI (true/false)
 	VERBOSE=false			# Verbose output (true/false)
 	VIEWER="fbi"			# Image viewer to use (fbi/fim)
+
+	# Get count of images available
+	MAX=$(curl -s https://xkcd.com/info.0.json | jq -r '.num')
 }
 
 
@@ -162,9 +165,6 @@ conics::download() {
 
 
 conics::watch() {
-	# Get count of images available
-	local MAX=$(curl -s https://xkcd.com/info.0.json | jq -r '.num')
-
 	# In case of error (e.g. no internet connection)
 	local status="${PIPESTATUS[0]}"
 	if [[ "$status" != 0 ]]; then

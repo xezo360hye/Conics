@@ -9,18 +9,18 @@ Conics `(CONsole comICS)` is a program that helps you watch comics from `xkcd.co
 
 Conics requires FBI or FIM to display images using framebuffer, so you need one or both installed
 
-Arch (FIM is in AUR):
+* Arch (FIM is in AUR):
 
 ```
 sudo pacman -S fbida
 yay -S fim
 ```
 
-Debian, Ubuntu and derivatives:
+* Debian, Ubuntu and derivatives:
 
 `sudo apt-get install fbi fim`
 
-Other:
+* Other:
 
 Idk, please tell me if you know
 
